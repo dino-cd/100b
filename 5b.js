@@ -9853,7 +9853,7 @@ function draw() {
 					ctx.fillStyle = challengeCaching ? '#003300' : '#222800';
 				}
 				ctx.beginPath();
-				ctx.roundRect(challengeBtnX, challengeBtnY, challengeBtnW, 30, 5);
+				ctx.roundRect(challengeBtnX - 30, challengeBtnY, 30, 30, 5);
 				ctx.fill();
 				ctx.fillStyle = challengeCaching ? '#88ff88' : '#ccff00';
 				ctx.font = 'bold 13px Helvetica';
