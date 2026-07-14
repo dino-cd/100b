@@ -3097,7 +3097,7 @@ function drawLevelButtons() {
 		ctx.fillText('Level ' + (challengeIndex + 1) + ' / 100', 835, 487);
 		ctx.font = '14px Helvetica';
 		ctx.fillStyle = '#aaaaaa';
-		ctx.fillText('P = reroll (–10pt)', 835, 508);
+		ctx.fillText('P = reroll (brkn)', 835, 508);
 	}
 }
 
@@ -9859,7 +9859,7 @@ function draw() {
 				ctx.font = 'bold 13px Helvetica';
 				ctx.textBaseline = 'middle';
 				ctx.textAlign = 'center';
-				ctx.fillText(challengeCaching ? 'loading...' : '100', challengeBtnX + challengeBtnW / 2, challengeBtnY + 15);
+				ctx.fillText(challengeCaching ? 'loading...' : '100', 15, 15);
 			}
 			// Page number
 			ctx.fillStyle = '#ffffff';
