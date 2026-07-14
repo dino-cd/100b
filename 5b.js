@@ -1,4 +1,3 @@
-
 /* For testing the performance of any block of code. It averages every 100 runs and prints to the console. To use, simply place the following around the code block you'd like to test:
 performanceTest(()=>{
 }); */
@@ -28,6 +27,16 @@ const browserCopySolution = typeof navigator.clipboard.write === "function";
 let copyButton = 0; // Hack to make copying work on Safari.
 const isMobile = isTouchDevice();
 let randomMode = false;
+
+let challengeMode = false;
+let challengeLevels = [];
+let challengeIndex = 0;
+let challengeStats = {totalTime: 0, totalDeaths: 0, totalMinDeaths: 0, totalResets: 0, rerolls: 0};
+let challengeLevelStartTime = 0;
+let challengeLevelDeaths = 0;
+let challengeLevelResets = 0;
+let challengeCaching = false;
+let pKeyWasDown = false;
 
 // offscreen canvases
 let osc1, osctx1;
@@ -3080,7 +3089,16 @@ function drawLevelButtons() {
 	ctx.textBaseline = 'top';
 	ctx.font = 'bold 32px Helvetica';
 	ctx.fillText(currentLevelDisplayName, 12.85, 495.45);
-	drawMenu2_3Button(0, 837.5, 486.95, playMode == 3 ? exitExploreLevel : playMode == 2 ? exitTestLevel : menu3Menu);
+	drawMenu2_3Button(0, 837.5, 486.95, playMode == 3 ? (challengeMode ? () => {} : exitExploreLevel) : playMode == 2 ? exitTestLevel : menu3Menu);
+	if (challengeMode) {
+		ctx.fillStyle = '#ccff00';
+		ctx.textAlign = 'right';
+		ctx.font = 'bold 18px Helvetica';
+		ctx.fillText('Level ' + (challengeIndex + 1) + ' / 100', 835, 487);
+		ctx.font = '14px Helvetica';
+		ctx.fillStyle = '#aaaaaa';
+		ctx.fillText('P = reroll (–10pt)', 835, 508);
+	}
 }
 
 //https://thewebdev.info/2021/05/15/how-to-add-line-breaks-into-the-html5-canvas-with-filltext/
@@ -4751,6 +4769,7 @@ function endDeath(i) {
 		char[i].atEnd = false;
 	}
 	deathCount++;
+	if (challengeMode) challengeLevelDeaths++;
 	saveGame();
 	if (i == control) changeControl();
 }
@@ -7751,7 +7770,11 @@ function draw() {
 						else exitLevel();
 					} else {
 						if (playMode == 3) {
-							exitExploreLevel();
+							if (challengeMode) {
+								onChallengeLevelBeaten();
+							} else {
+								exitExploreLevel();
+							}
 						} else if (playMode == 2) {
 							exitTestLevel();
 						} else {
@@ -7905,8 +7928,14 @@ function draw() {
 			if (_keysDown[82] && wipeTimer == 0) {
 				wipeTimer = 1;
 				transitionType = 0;
+				if (challengeMode) challengeLevelResets++;
 				// if (cutScene == 1) csBubble.gotoAndPlay(17);
 			}
+
+			if (challengeMode && _keysDown[80] && !pKeyWasDown && wipeTimer == 0) {
+				rerollChallengeLevel();
+			}
+			pKeyWasDown = _keysDown[80];
 			locations[4] = 1000;
 			for (let i = 0; i < charCount; i++) {
 				if (char[i].charState >= 5) {
@@ -9686,7 +9715,24 @@ function draw() {
 			}
 
 			// Levels
-			if (exploreLoading) {
+			if (challengeCaching) {
+				ctx.fillStyle = 'rgba(0,0,0,0.7)';
+				ctx.fillRect(28, 130, 904, 340);
+				ctx.fillStyle = '#ccff00';
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				ctx.font = 'bold 28px Helvetica';
+				ctx.fillText('Fetching 100 random levels...', cwidth / 2, 270);
+				ctx.font = '20px Helvetica';
+				ctx.fillStyle = '#ffffff';
+				ctx.fillText(challengeLevels.length + ' / 100 cached', cwidth / 2, 310);
+				const barW = 500;
+				const barX = (cwidth - barW) / 2;
+				ctx.fillStyle = '#333333';
+				ctx.fillRect(barX, 330, barW, 18);
+				ctx.fillStyle = '#ccff00';
+				ctx.fillRect(barX, 330, barW * (challengeLevels.length / 100), 18);
+			} else if (exploreLoading) {
 				drawExploreLoadingText();
 			} else {
 				for (let i = 0; i < explorePageLevels.length; i++) {
@@ -9756,8 +9802,12 @@ function draw() {
 					ctx.fillStyle = randomMode ? '#002aff' : '#404040';
 					onButton = true;
 					if (mouseIsDown && !pmouseIsDown) {
-						randomMode = true;
-						getRandomLevels()
+						if (_keysDown[16]) {
+							startChallenge();
+						} else {
+							randomMode = true;
+							getRandomLevels();
+						}
 					}
 				} else ctx.fillStyle = randomMode ? '#001ba0' : '#333333';
 				ctx.roundRect(exploreRandomDieX, exploreRandomDieY, 30, 30, 5);
@@ -9789,6 +9839,27 @@ function draw() {
 				let sortingText = exploreSortText[exploreSort][0].toLocaleUpperCase() + exploreSortText[exploreSort].slice(1)
 				ctx.fillText(sortingText, 650, 88);
 				ctx.fillText('Play the Daily!', 992-exploreSortTextWidth + 5, 88);
+
+				const challengeBtnX = 566;
+				const challengeBtnY = 85;
+				const challengeBtnW = 90;
+				if (onRect(_xmouse, _ymouse, challengeBtnX, challengeBtnY, challengeBtnW, 30)) {
+					ctx.fillStyle = challengeCaching ? '#005500' : '#334400';
+					onButton = true;
+					if (mouseIsDown && !pmouseIsDown && !challengeCaching) {
+						startChallenge();
+					}
+				} else {
+					ctx.fillStyle = challengeCaching ? '#003300' : '#222800';
+				}
+				ctx.beginPath();
+				ctx.roundRect(challengeBtnX, challengeBtnY, challengeBtnW, 30, 5);
+				ctx.fill();
+				ctx.fillStyle = challengeCaching ? '#88ff88' : '#ccff00';
+				ctx.font = 'bold 13px Helvetica';
+				ctx.textBaseline = 'middle';
+				ctx.textAlign = 'center';
+				ctx.fillText(challengeCaching ? 'loading...' : '100', challengeBtnX + challengeBtnW / 2, challengeBtnY + 15);
 			}
 			// Page number
 			ctx.fillStyle = '#ffffff';
@@ -10772,6 +10843,134 @@ function getExploreUserPage(id, p, t, s) {
 			console.log(err);
 			requestError();
 		});
+}
+
+function startChallenge() {
+	challengeMode = true;
+	challengeLevels = [];
+	challengeIndex = 0;
+	challengeStats = {totalTime: 0, totalDeaths: 0, totalMinDeaths: 0, totalResets: 0, rerolls: 0};
+	challengeCaching = true;
+	cacheChallengeLevels();
+}
+
+async function cacheChallengeLevels() {
+	while (challengeLevels.length < 100) {
+		try {
+			const resp = await fetch('https://5beam.zelo.dev/api/get/page/random', {method: 'GET'});
+			if (!resp.ok) {
+				await fetch('https://5beam.zelo.dev/api/page/random?type=0', {method: 'GET'}).then(async r => {
+					const data = await r.json();
+					for (const lvl of data) {
+						if (challengeLevels.length < 100) challengeLevels.push(lvl);
+					}
+				});
+			} else {
+				const data = await resp.json();
+				if (Array.isArray(data)) {
+					for (const lvl of data) {
+						if (challengeLevels.length < 100) challengeLevels.push(lvl);
+					}
+				} else if (data && data.data) {
+					if (challengeLevels.length < 100) challengeLevels.push(data);
+				}
+			}
+		} catch (e) {
+			try {
+				const resp2 = await fetch('https://5beam.zelo.dev/api/page/random?type=0', {method: 'GET'});
+				const data2 = await resp2.json();
+				for (const lvl of data2) {
+					if (challengeLevels.length < 100) challengeLevels.push(lvl);
+				}
+			} catch (e2) {}
+		}
+	}
+	challengeCaching = false;
+	playChallengeLevel(0);
+}
+
+function playChallengeLevel(idx) {
+	challengeIndex = idx;
+	const lvl = challengeLevels[idx];
+	exploreLevelPageLevel = lvl;
+	exploreLevelPageType = 0;
+	readExploreLevelString(lvl.data);
+	playMode = 3;
+	menuScreen = 3;
+	wipeTimer = 30;
+	toSeeCS = true;
+	transitionType = 1;
+	challengeLevelStartTime = performance.now();
+	challengeLevelDeaths = 0;
+	challengeLevelResets = 0;
+	resetLevel();
+}
+
+function rerollChallengeLevel() {
+	if (!challengeMode) return;
+	challengeStats.rerolls++;
+	const lvl = challengeLevels[challengeIndex];
+	exploreLevelPageLevel = lvl;
+	exploreLevelPageType = 0;
+	readExploreLevelString(lvl.data);
+	playMode = 3;
+	menuScreen = 3;
+	wipeTimer = 30;
+	toSeeCS = true;
+	transitionType = 1;
+	challengeLevelStartTime = performance.now();
+	challengeLevelDeaths = 0;
+	challengeLevelResets = 0;
+	resetLevel();
+}
+
+function onChallengeLevelBeaten() {
+	const elapsed = performance.now() - challengeLevelStartTime;
+	challengeStats.totalTime += elapsed;
+	challengeStats.totalDeaths += challengeLevelDeaths;
+	challengeStats.totalResets += challengeLevelResets;
+
+	if (challengeIndex >= 99) {
+		finishChallenge();
+	} else {
+		playChallengeLevel(challengeIndex + 1);
+	}
+}
+
+function finishChallenge() {
+	challengeMode = false;
+	menuScreen = 6;
+	exploreDescLine = 0;
+	exploreTextBoxes();
+	setExplorePage(1);
+
+	const timeSeconds = challengeStats.totalTime / 1000;
+	const deaths = challengeStats.totalDeaths;
+	const rerolls = challengeStats.rerolls;
+	const resets = challengeStats.totalResets;
+
+	let score = 1000;
+	score -= Math.min(300, timeSeconds * 0.3);
+	score -= Math.min(300, deaths * 3);
+	score -= Math.min(200, rerolls * 10);
+	score -= Math.min(100, resets * 0.5);
+	score = Math.max(0, Math.round(score));
+
+	const h = Math.floor(timeSeconds / 3600);
+	const m = Math.floor((timeSeconds % 3600) / 60);
+	const s = Math.floor(timeSeconds % 60);
+	const timeStr = h.toString().padStart(2,'0') + ':' + m.toString().padStart(2,'0') + ':' + s.toString().padStart(2,'0');
+
+	setTimeout(() => {
+		alert(
+			'thank you for participingddd\n\n' +
+			'score: ' + score + ' / 1000\n\n' +
+			'time: ' + timeStr + '\n' +
+			'deaths: ' + deaths + '\n' +
+			'rerolls: ' + rerolls + '\n' +
+			'resets: ' + resets
+		);
+	}, 100);
 }
 
 function getRandomLevels() {
