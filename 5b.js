@@ -3097,7 +3097,7 @@ function drawLevelButtons() {
 		ctx.fillText('Level ' + (challengeIndex + 1) + ' / 100', 835, 487);
 		ctx.font = '14px Helvetica';
 		ctx.fillStyle = '#aaaaaa';
-		ctx.fillText('P = reroll (brkn)', 835, 508);
+		ctx.fillText('P = reroll - point', 835, 508);
 	}
 }
 
@@ -9722,7 +9722,7 @@ function draw() {
 				ctx.textAlign = 'center';
 				ctx.textBaseline = 'middle';
 				ctx.font = 'bold 28px Helvetica';
-				ctx.fillText('Fetching 100 random levels...', cwidth / 2, 270);
+				ctx.fillText('fetching from 5beam.zelo.dev', cwidth / 2, 270);
 				ctx.font = '20px Helvetica';
 				ctx.fillStyle = '#ffffff';
 				ctx.fillText(challengeLevels.length + ' / 100 cached', cwidth / 2, 310);
@@ -9831,6 +9831,27 @@ function draw() {
 				ctx.arc(exploreRandomDieX + 24, exploreRandomDieY + 24, dieDimpleSize, 0, Math.PI * 2, false);
 				ctx.fill();
 
+				const challengeBtnW = 52;
+				const challengeBtnX = exploreRandomDieX - challengeBtnW - 6;
+				const challengeBtnY = exploreRandomDieY;
+				if (onRect(_xmouse, _ymouse, challengeBtnX, challengeBtnY, challengeBtnW, 30)) {
+					ctx.fillStyle = challengeCaching ? '#005500' : '#334400';
+					onButton = true;
+					if (mouseIsDown && !pmouseIsDown && !challengeCaching) {
+						startChallenge();
+					}
+				} else {
+					ctx.fillStyle = challengeCaching ? '#003300' : '#1e2800';
+				}
+				ctx.beginPath();
+				ctx.roundRect(challengeBtnX, challengeBtnY, challengeBtnW, 30, 5);
+				ctx.fill();
+				ctx.fillStyle = challengeCaching ? '#88ff88' : '#ccff00';
+				ctx.font = 'bold 16px Helvetica';
+				ctx.textBaseline = 'middle';
+				ctx.textAlign = 'center';
+				ctx.fillText('100', challengeBtnX + challengeBtnW / 2, challengeBtnY + 15);
+
 				ctx.textBaseline = 'top';
 				ctx.textAlign = 'center';
 				ctx.fillStyle = '#ffffff';
@@ -9839,27 +9860,6 @@ function draw() {
 				let sortingText = exploreSortText[exploreSort][0].toLocaleUpperCase() + exploreSortText[exploreSort].slice(1)
 				ctx.fillText(sortingText, 650, 88);
 				ctx.fillText('Play the Daily!', 992-exploreSortTextWidth + 5, 88);
-
-				const challengeBtnX = 566;
-				const challengeBtnY = 85;
-				const challengeBtnW = 90;
-				if (onRect(_xmouse, _ymouse, challengeBtnX, challengeBtnY, challengeBtnW, 30)) {
-					ctx.fillStyle = challengeCaching ? '#005500' : '#334400';
-					onButton = true;
-					if (mouseIsDown && !pmouseIsDown && !challengeCaching) {
-						startChallenge();
-					}
-				} else {
-					ctx.fillStyle = challengeCaching ? '#003300' : '#222800';
-				}
-				ctx.beginPath();
-				ctx.roundRect(challengeBtnX - 30, challengeBtnY, 30, 30, 5);
-				ctx.fill();
-				ctx.fillStyle = challengeCaching ? '#88ff88' : '#ccff00';
-				ctx.font = 'bold 13px Helvetica';
-				ctx.textBaseline = 'middle';
-				ctx.textAlign = 'center';
-				ctx.fillText(challengeCaching ? 'loading...' : '100', 15, 15);
 			}
 			// Page number
 			ctx.fillStyle = '#ffffff';
@@ -10857,33 +10857,30 @@ function startChallenge() {
 async function cacheChallengeLevels() {
 	while (challengeLevels.length < 100) {
 		try {
-			const resp = await fetch('https://5beam.zelo.dev/api/get/page/random', {method: 'GET'});
-			if (!resp.ok) {
-				await fetch('https://5beam.zelo.dev/api/page/random?type=0', {method: 'GET'}).then(async r => {
-					const data = await r.json();
-					for (const lvl of data) {
-						if (challengeLevels.length < 100) challengeLevels.push(lvl);
-					}
-				});
-			} else {
+			const resp = await fetch('https://5beam.zelo.dev/api/page/random?type=0&amount=1', {method: 'GET'});
+			if (resp.ok) {
 				const data = await resp.json();
-				if (Array.isArray(data)) {
+				if (Array.isArray(data) && data.length > 0) {
 					for (const lvl of data) {
 						if (challengeLevels.length < 100) challengeLevels.push(lvl);
 					}
+					continue;
 				} else if (data && data.data) {
 					if (challengeLevels.length < 100) challengeLevels.push(data);
+					continue;
 				}
 			}
-		} catch (e) {
-			try {
-				const resp2 = await fetch('https://5beam.zelo.dev/api/page/random?type=0', {method: 'GET'});
+		} catch (e) {}
+		try {
+			const resp2 = await fetch('https://5beam.zelo.dev/api/page/random?type=0', {method: 'GET'});
+			if (resp2.ok) {
 				const data2 = await resp2.json();
-				for (const lvl of data2) {
-					if (challengeLevels.length < 100) challengeLevels.push(lvl);
+				if (Array.isArray(data2) && data2.length > 0) {
+					const pick = data2[Math.floor(Math.random() * data2.length)];
+					if (challengeLevels.length < 100) challengeLevels.push(pick);
 				}
-			} catch (e2) {}
-		}
+			}
+		} catch (e2) {}
 	}
 	challengeCaching = false;
 	playChallengeLevel(0);
@@ -10906,9 +10903,28 @@ function playChallengeLevel(idx) {
 	resetLevel();
 }
 
-function rerollChallengeLevel() {
+async function rerollChallengeLevel() {
 	if (!challengeMode) return;
 	challengeStats.rerolls++;
+	let newLvl = null;
+	try {
+		const resp = await fetch('https://5beam.zelo.dev/api/page/random?type=0&amount=1', {method: 'GET'});
+		if (resp.ok) {
+			const data = await resp.json();
+			if (Array.isArray(data) && data.length > 0) newLvl = data[0];
+			else if (data && data.data) newLvl = data;
+		}
+	} catch (e) {}
+	if (!newLvl) {
+		try {
+			const resp2 = await fetch('https://5beam.zelo.dev/api/page/random?type=0', {method: 'GET'});
+			if (resp2.ok) {
+				const data2 = await resp2.json();
+				if (Array.isArray(data2) && data2.length > 0) newLvl = data2[Math.floor(Math.random() * data2.length)];
+			}
+		} catch (e2) {}
+	}
+	if (newLvl) challengeLevels[challengeIndex] = newLvl;
 	const lvl = challengeLevels[challengeIndex];
 	exploreLevelPageLevel = lvl;
 	exploreLevelPageType = 0;
@@ -10963,12 +10979,12 @@ function finishChallenge() {
 
 	setTimeout(() => {
 		alert(
-			'thank you for participingddd\n\n' +
-			'score: ' + score + ' / 1000\n\n' +
-			'time: ' + timeStr + '\n' +
-			'deaths: ' + deaths + '\n' +
-			'rerolls: ' + rerolls + '\n' +
-			'resets: ' + resets
+			'result\n\n' +
+			'score ' + score + ' / 1000\n\n' +
+			'time ' + timeStr + '\n' +
+			'deaths ' + deaths + '\n' +
+			'reroll ' + rerolls + '\n' +
+			'resets ' + resets
 		);
 	}, 100);
 }
