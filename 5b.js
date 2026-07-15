@@ -9847,8 +9847,7 @@ function draw() {
 				ctx.roundRect(challengeBtnX, challengeBtnY, challengeBtnW, 30, 5);
 				ctx.fill();
 				ctx.fillStyle = challengeCaching ? '#88ff88' : '#ccff00';
-				ctx.font = 'bold 16px Helvetica';
-				ctx.textBaseline = 'middle';
+				ctx.font = '24px Helvetica';
 				ctx.textAlign = 'center';
 				ctx.fillText('100', challengeBtnX + challengeBtnW / 2, challengeBtnY + 15);
 
