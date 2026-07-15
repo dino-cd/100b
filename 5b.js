@@ -10856,7 +10856,7 @@ function startChallenge() {
 async function cacheChallengeLevels() {
 	while (challengeLevels.length < 100) {
 		try {
-			const resp = await fetch('https://5beam.zelo.dev/api/page/random?type=0&amount=1', {method: 'GET'});
+			const resp = await fetch('https://5beam.zelo.dev/api/page/random?type=0&amount=16', {method: 'GET'});
 			if (resp.ok) {
 				const data = await resp.json();
 				if (Array.isArray(data) && data.length > 0) {
