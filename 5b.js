@@ -4228,6 +4228,9 @@ function getCoin(i) {
 			Math.ceil(char[i].y / 30) - 1 >= locations[3]
 		) {
 			gotThisCoin = true;
+			const coinSfx = new Audio('data/coin.mp3');
+			coinSfx.play();
+			if (challengeMode) challengeStats.winTokens++;
 		}
 	}
 }
@@ -7771,6 +7774,7 @@ function draw() {
 					} else {
 						if (playMode == 3) {
 							if (challengeMode) {
+								new Audio('data/endGate.mp3').play();
 								onChallengeLevelBeaten();
 							} else {
 								exitExploreLevel();
@@ -10848,7 +10852,7 @@ function startChallenge() {
 	challengeMode = true;
 	challengeLevels = [];
 	challengeIndex = 0;
-	challengeStats = {totalTime: 0, totalDeaths: 0, totalMinDeaths: 0, totalResets: 0, rerolls: 0};
+	challengeStats = {totalTime: 0, totalDeaths: 0, totalMinDeaths: 0, totalResets: 0, rerolls: 0, winTokens: 0};
 	challengeCaching = true;
 	cacheChallengeLevels();
 }
@@ -10945,6 +10949,11 @@ function onChallengeLevelBeaten() {
 	challengeStats.totalDeaths += challengeLevelDeaths;
 	challengeStats.totalResets += challengeLevelResets;
 
+	const lvlDiff = challengeLevels[challengeIndex] && challengeLevels[challengeIndex].difficulty;
+	if (lvlDiff && lvlDiff >= 1 && lvlDiff <= 2) {
+		challengeStats.difficultyBonus = (challengeStats.difficultyBonus || 0) + lvlDiff;
+	}
+
 	if (challengeIndex >= 99) {
 		finishChallenge();
 	} else {
@@ -10964,12 +10973,16 @@ function finishChallenge() {
 	const rerolls = challengeStats.rerolls;
 	const resets = challengeStats.totalResets;
 
+	const winTokens = challengeStats.winTokens || 0;
+	const difficultyBonus = challengeStats.difficultyBonus || 0;
+
 	let score = 1000;
 	score -= Math.min(300, timeSeconds * 0.3);
 	score -= Math.min(300, deaths * 3);
 	score -= Math.min(200, rerolls * 10);
 	score -= Math.min(100, resets * 0.5);
 	score = Math.max(0, Math.round(score));
+	score += winTokens + difficultyBonus;
 
 	const h = Math.floor(timeSeconds / 3600);
 	const m = Math.floor((timeSeconds % 3600) / 60);
@@ -10979,11 +10992,13 @@ function finishChallenge() {
 	setTimeout(() => {
 		alert(
 			'result\n\n' +
-			'score ' + score + ' / 1000\n\n' +
+			'score ' + score + '\n\n' +
 			'time ' + timeStr + '\n' +
 			'deaths ' + deaths + '\n' +
 			'reroll ' + rerolls + '\n' +
-			'resets ' + resets
+			'resets ' + resets + '\n' +
+			'win tokens ' + winTokens + '\n' +
+			'difficulty bonus ' + difficultyBonus
 		);
 	}, 100);
 }
